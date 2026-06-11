@@ -910,28 +910,30 @@ impl Config {
         }
     }
 
-    pub fn get_rendezvous_server() -> String {
-        let mut rendezvous_server = EXE_RENDEZVOUS_SERVER.read().unwrap().clone();
-        if rendezvous_server.is_empty() {
-            rendezvous_server = Self::get_option("custom-rendezvous-server");
-        }
-        if rendezvous_server.is_empty() {
-            rendezvous_server = PROD_RENDEZVOUS_SERVER.read().unwrap().clone();
-        }
-        if rendezvous_server.is_empty() {
-            rendezvous_server = CONFIG2.read().unwrap().rendezvous_server.clone();
-        }
-        if rendezvous_server.is_empty() {
-            rendezvous_server = Self::get_rendezvous_servers()
-                .drain(..)
-                .next()
-                .unwrap_or_default();
-        }
-        if !rendezvous_server.contains(':') {
-            rendezvous_server = format!("{rendezvous_server}:{RENDEZVOUS_PORT}");
-        }
-        rendezvous_server
+pub fn get_rendezvous_server() -> String {
+    let mut rendezvous_server = EXE_RENDEZVOUS_SERVER.read().unwrap().clone();
+    if rendezvous_server.is_empty() {
+        rendezvous_server = Self::get_option("custom-rendezvous-server");
     }
+    if rendezvous_server.is_empty() {
+        rendezvous_server = PROD_RENDEZVOUS_SERVER.read().unwrap().clone();
+    }
+    // 硬编码数组的优先级提前到这里
+    if rendezvous_server.is_empty() {
+        rendezvous_server = Self::get_rendezvous_servers()
+            .drain(..)
+            .next()
+            .unwrap_or_default();
+    }
+    // 原来的 CONFIG2 放到最后作为 fallback
+    if rendezvous_server.is_empty() {
+        rendezvous_server = CONFIG2.read().unwrap().rendezvous_server.clone();
+    }
+    if !rendezvous_server.contains(':') {
+        rendezvous_server = format!("{rendezvous_server}:{RENDEZVOUS_PORT}");
+    }
+    rendezvous_server
+}
 
     pub fn get_rendezvous_servers() -> Vec<String> {
         let s = EXE_RENDEZVOUS_SERVER.read().unwrap().clone();

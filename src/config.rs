@@ -536,32 +536,24 @@ impl Config2 {
         return CONFIG2.read().unwrap().clone();
     }
 
-    pub fn set(cfg: Config2) -> bool {
-        let mut lock = CONFIG2.write().unwrap();
-            
-    // ========== 新增拦截逻辑 ==========
-    // 如果新配置中的 rendezvous_server 不是你的服务器，就忽略它
-    // 你的服务器地址是 "rusk.uray.online:41116"
+pub fn set(cfg: Config2) -> bool {
+    let mut lock = CONFIG2.write().unwrap();
+    
     let my_server = "rusk.uray.online:41116";
+    let mut final_cfg = cfg.clone();
+    
     if !cfg.rendezvous_server.is_empty() && cfg.rendezvous_server != my_server {
         log::warn!("阻止覆盖自定义服务器地址: {} -> {}", 
             lock.rendezvous_server, cfg.rendezvous_server);
-        // 创建一个新配置，只复制非服务器的部分
-        let mut filtered_cfg = cfg.clone();
-        filtered_cfg.rendezvous_server = lock.rendezvous_server.clone();
-        *lock = filtered_cfg;
-    } else {
-        *lock = cfg;
+        final_cfg.rendezvous_server = lock.rendezvous_server.clone();
     }
-    // ========== 拦截逻辑结束 ==========
-        
-        if *lock == cfg {
-            return false;
-        }
-        *lock = cfg;
-        lock.store();
-        true
+    
+    if *lock == final_cfg {
+        return false;
     }
+    *lock = final_cfg;
+    lock.store();
+    true
 }
 
 fn keep_encrypted_storage_if_plaintext_unchanged(plain: &str, stored: &str) -> String {

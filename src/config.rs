@@ -865,26 +865,31 @@ impl Config {
         *ONLINE.lock().unwrap() = Default::default();
     }
 
-    pub fn update_latency(host: &str, latency: i64) {
-        ONLINE.lock().unwrap().insert(host.to_owned(), latency);
-        let mut host = "".to_owned();
-        let mut delay = i64::MAX;
-        for (tmp_host, tmp_delay) in ONLINE.lock().unwrap().iter() {
-            if tmp_delay > &0 && tmp_delay < &delay {
-                delay = *tmp_delay;
-                host = tmp_host.to_string();
-            }
-        }
-        if !host.is_empty() {
-            let mut config = CONFIG2.write().unwrap();
-            if host != config.rendezvous_server {
-                log::debug!("Update rendezvous_server in config to {}", host);
-                log::debug!("{:?}", *ONLINE.lock().unwrap());
-                config.rendezvous_server = host;
-                config.store();
-            }
+pub fn update_latency(host: &str, latency: i64) {
+    // 阻止写入官方服务器地址
+    if host.contains("rustdesk.com") {
+        log::debug!("阻止写入官方服务器地址: {}", host);
+        return;
+    }
+    ONLINE.lock().unwrap().insert(host.to_owned(), latency);
+    let mut host = "".to_owned();
+    let mut delay = i64::MAX;
+    for (tmp_host, tmp_delay) in ONLINE.lock().unwrap().iter() {
+        if tmp_delay > &0 && tmp_delay < &delay {
+            delay = *tmp_delay;
+            host = tmp_host.to_string();
         }
     }
+    if !host.is_empty() {
+        let mut config = CONFIG2.write().unwrap();
+        if host != config.rendezvous_server {
+            log::debug!("Update rendezvous_server in config to {}", host);
+            log::debug!("{:?}", *ONLINE.lock().unwrap());
+            config.rendezvous_server = host;
+            config.store();
+        }
+    }
+}
 
     pub fn set_id(id: &str) {
         let mut config = CONFIG.write().unwrap();
@@ -1147,25 +1152,30 @@ impl Config {
         option2bool(k, &Self::get_option(k))
     }
 
-    pub fn set_option(k: String, v: String) {
-        if !is_option_can_save(&OVERWRITE_SETTINGS, &k, &DEFAULT_SETTINGS, &v) {
-            let mut config = CONFIG2.write().unwrap();
-            if config.options.remove(&k).is_some() {
-                config.store();
-            }
-            return;
-        }
+pub fn set_option(k: String, v: String) {
+    // 拦截写入 rendezvous-servers
+    if k == "rendezvous-servers" {
+        log::info!("阻止覆盖 rendezvous-servers: {}", v);
+        return;
+    }
+    if !is_option_can_save(&OVERWRITE_SETTINGS, &k, &DEFAULT_SETTINGS, &v) {
         let mut config = CONFIG2.write().unwrap();
-        let v2 = if v.is_empty() { None } else { Some(&v) };
-        if v2 != config.options.get(&k) {
-            if v2.is_none() {
-                config.options.remove(&k);
-            } else {
-                config.options.insert(k, v);
-            }
+        if config.options.remove(&k).is_some() {
             config.store();
         }
+        return;
     }
+    let mut config = CONFIG2.write().unwrap();
+    let v2 = if v.is_empty() { None } else { Some(&v) };
+    if v2 != config.options.get(&k) {
+        if v2.is_none() {
+            config.options.remove(&k);
+        } else {
+            config.options.insert(k, v);
+        }
+        config.store();
+    }
+}
 
     pub fn update_id() {
         let id = Self::get_id();
